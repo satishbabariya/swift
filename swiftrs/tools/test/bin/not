@@ -1,0 +1,26 @@
+#!/usr/bin/env python3
+"""LLVM's `not` test utility: invert a command's exit status.
+
+  not CMD...          succeed iff CMD exits non-zero without crashing
+  not --crash CMD...  succeed iff CMD crashes (killed by a signal / abort)
+"""
+import subprocess
+import sys
+
+args = sys.argv[1:]
+expect_crash = bool(args) and args[0] == "--crash"
+if expect_crash:
+    args = args[1:]
+if not args:
+    sys.exit("usage: not [--crash] command [args...]")
+try:
+    rc = subprocess.call(args)
+except OSError as e:
+    print(f"not: {args[0]}: {e}", file=sys.stderr)
+    sys.exit(0 if not expect_crash else 1)
+# Negative return codes are signals. Rust panics with panic=abort raise SIGABRT;
+# an unwinding panic exits with 101, which also counts as a crash.
+crashed = rc < 0 or rc == 101 or rc >= 128
+if expect_crash:
+    sys.exit(0 if crashed else 1)
+sys.exit(0 if (rc != 0 and not crashed) else 1)
